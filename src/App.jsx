@@ -19,10 +19,13 @@ const App = () => {
 
   if (pathname === "/loading" || loadingUser) return <Loading />;
 
+  // Public routes that don't require authentication
+  const isPublicRoute = pathname === "/credits";
+
   return (
     <>
       <Toaster />
-      {!isMenuOpen && (
+      {!isMenuOpen && user && (
         <img
           src={assets.menu_icon}
           className="absolute top-3 left-3 w-8 h-8 cursor-pointer md:hidden not-dark:invert"
@@ -30,17 +33,17 @@ const App = () => {
         />
       )}
 
-      {/* 🔹 Main app always loads, even if user is demo */}
-      {user ? (
+      {/* Show app if user is logged in OR on public route */}
+      {user || isPublicRoute ? (
         <div className="dark:bg-linear-to-b dark:from-[#242124] dark:to-[#000000] dark:text-white">
           <div className="flex h-screen w-screen p-2">
-            <Sidebar isMenuOpen={isMenuOpen} setIsMenuOpen={setIsMenuOpen} />
+            {user && <Sidebar isMenuOpen={isMenuOpen} setIsMenuOpen={setIsMenuOpen} />}
             <Routes>
-              <Route path="/" element={<Chatbox />} />
+              <Route path="/" element={user ? <Chatbox /> : <Login />} />
               <Route path="/credits" element={<Credits />} />
-              <Route path="/community" element={<Community />} />
+              <Route path="/community" element={user ? <Community /> : <Login />} />
             </Routes>
-            <Message />
+            {user && <Message />}
           </div>
         </div>
       ) : (

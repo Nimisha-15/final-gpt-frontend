@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import Loading from "./Loading";
 import { useAppContext } from "../context/AppContext";
 import toast from "react-hot-toast";
@@ -6,7 +7,8 @@ import toast from "react-hot-toast";
 const Credits = () => {
   const [plans, setPlans] = useState([]); // ← renamed to "plans" (plural)
   const [loading, setLoading] = useState(true);
-  const { axios } = useAppContext();
+  const { axios, user } = useAppContext();
+  const navigate = useNavigate();
 
   // Fetch plans from backend
   const fetchPlans = async () => {
@@ -31,6 +33,13 @@ const Credits = () => {
 
   // Purchase plan → redirect to Stripe Checkout
   const purchasePlan = async (planId) => {
+    // Check if user is logged in
+    if (!user) {
+      toast.error("Please login to purchase credits");
+      navigate("/");
+      return;
+    }
+
     try {
       const { data } = await axios.post(
         "/api/payment/purchase",
@@ -99,7 +108,20 @@ const Credits = () => {
 
   // Main UI
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 mt-10">
+    <div className={`${!user ? 'w-full' : ''} max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12`}>
+      {/* Header for non-logged in users */}
+      {!user && (
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-2xl font-bold text-cyan-600">MyGPT</h1>
+          <button
+            onClick={() => navigate("/")}
+            className="px-6 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-lg font-medium hover:from-blue-700 hover:to-cyan-700 transition-all"
+          >
+            Login / Sign Up
+          </button>
+        </div>
+      )}
+
       <h2 className="text-4xl font-bold text-center mb-16 text-gray-800 dark:text-white">
         Choose Your Credits Plan
       </h2>
@@ -147,16 +169,10 @@ const Credits = () => {
             </div>
 
             <button
-              onClick={() =>
-                toast.promise(purchasePlan(plan._id), {
-                  loading: "Redirecting to payment...",
-                  success: "Opening secure checkout",
-                  error: "Payment failed",
-                })
-              }
+              onClick={() => purchasePlan(plan._id)}
               className="mt-8 w-full py-4 rounded-xl text-white font-semibold text-lg bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 transition-all shadow-md"
             >
-              Buy Now
+              {user ? "Buy Now" : "Login to Buy"}
             </button>
           </div>
         ))}
