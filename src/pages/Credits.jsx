@@ -14,7 +14,6 @@ const Credits = () => {
       const { data } = await axios.get("/api/payment/plans", {
         withCredentials: true,
       });
-      console.log("Plans API response:", data);
 
       if (data.success && data.plans) {
         setPlans(data.plans);
@@ -23,7 +22,6 @@ const Credits = () => {
         setPlans([]); // fallback
       }
     } catch (error) {
-      console.error("Error fetching plans:", error);
       toast.error(error.response?.data?.message || "Network error");
       setPlans([]);
     } finally {

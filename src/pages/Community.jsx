@@ -11,7 +11,6 @@ const Community = () => {
   const fetchImages = async (params) => {
     try {
       const { data } = await axios.get("/api/user/published-images");
-      console.log("Community API response:", data);
       if (data.success) {
         setImages(data.images);
       } else {

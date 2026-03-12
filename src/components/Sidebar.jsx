@@ -4,6 +4,7 @@ import { assets } from "../assets/assets";
 import moment from "moment";
 import custom_logo from "../assets/custom_logo.svg";
 import toast from "react-hot-toast";
+import ProfileModal from "./ProfileModal";
 
 const Sidebar = ({ isMenuOpen, setIsMenuOpen }) => {
   const {
@@ -20,6 +21,7 @@ const Sidebar = ({ isMenuOpen, setIsMenuOpen }) => {
     fetchUserChats,
   } = useAppContext();
   const [search, setSearch] = useState("");
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   const deleteChat = async (e, chatId) => {
     try {
@@ -29,7 +31,7 @@ const Sidebar = ({ isMenuOpen, setIsMenuOpen }) => {
       const { data } = await axios.post(
         "/api/chat/delete-chat",
         { chatId },
-        { withCredentials: true }
+        { withCredentials: true },
       );
       if (data.createdChat) {
         setChats((prev) => prev.filter((chat) => chat._id !== chatId)); // chats update karo
@@ -93,7 +95,7 @@ const Sidebar = ({ isMenuOpen, setIsMenuOpen }) => {
               ? chat.messages[0].content
                   .toLowerCase()
                   .includes(search.toLowerCase())
-              : chat.name.toLowerCase().includes(search.toLowerCase())
+              : chat.name.toLowerCase().includes(search.toLowerCase()),
           )
           .map((chat) => (
             <div
@@ -187,20 +189,24 @@ const Sidebar = ({ isMenuOpen, setIsMenuOpen }) => {
       </div>
 
       {/* User Account  */}
-      <div className="flex items-center gap-3 p-2 mt-3 border border-gray-600 dark:border-white/15 rounded-md cursor-pointer group bg-[#82b5d9]/30 dark:bg-[#072024] ">
+      <div
+        onClick={() => setIsProfileOpen(true)}
+        className="flex items-center gap-3 p-2 mt-3 border border-gray-600 dark:border-white/15 rounded-md cursor-pointer group bg-[#82b5d9]/30 dark:bg-[#072024] hover:bg-[#82b5d9]/50 dark:hover:bg-[#0a3a47] transition-all duration-200"
+      >
         <img src={assets.user_icon} className=" w-9 rounded-full  " />
         <p className="flex-1 text-md dark:text-[#eaecec] truncate">
           {user ? user.name : "Login your Account "}
         </p>
-        {user && (
-          <img
-            src={assets.logout_icon}
-            onClick={logout}
-            className="h-6 cursor-pointer not-dark:invert dark:text-white group-hover:block "
-            alt="Logout"
-          />
-        )}
+        <span className="text-lg opacity-0 group-hover:opacity-100 transition-opacity">
+          →
+        </span>
       </div>
+
+      {/* Profile Modal */}
+      <ProfileModal
+        isOpen={isProfileOpen}
+        onClose={() => setIsProfileOpen(false)}
+      />
 
       <img
         onClick={() => {

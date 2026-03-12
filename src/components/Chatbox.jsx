@@ -3,22 +3,80 @@ import { useAppContext } from "../context/AppContext";
 import { assets } from "../assets/assets";
 import Message from "./Message";
 import toast from "react-hot-toast";
+import {
+  validatePrompt,
+  getErrorMessage,
+  isSufficientCredits,
+  VALIDATION_MESSAGES,
+} from "../utils/validation";
 
 const Chatbox = () => {
   const containerRef = useRef(null);
 
-  const { selectedChats, theme, user, axios, token, setUser } = useAppContext();
+  const { selectedChats, theme, user, axios } = useAppContext();
   const [message, setMessage] = useState([]);
   const [loading, setLoading] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [mode, setMode] = useState("text");
   const [isPublished, setIsPublished] = useState(false);
+  const [lastPromptUsed, setLastPromptUsed] = useState("");
+  const [lastModeUsed, setLastModeUsed] = useState("");
+  const [error, setError] = useState("");
 
   const onSubmit = async (e) => {
     e.preventDefault();
-    if (!prompt.trim() || !user || !selectedChats._id || loading) return;
+    setError("");
 
+    // Pre-submission validation
     const currentPrompt = prompt.trim();
+
+    // Validate prompt
+    const promptError = validatePrompt(currentPrompt);
+    if (promptError) {
+      setError(promptError);
+      toast.error(promptError);
+      return;
+    }
+
+    // Check if user is logged in
+    if (!user) {
+      setError(VALIDATION_MESSAGES.NO_USER);
+      toast.error(VALIDATION_MESSAGES.NO_USER);
+      return;
+    }
+
+    // Check if chat is selected
+    if (!selectedChats?._id) {
+      setError(VALIDATION_MESSAGES.NO_CHAT_SELECTED);
+      toast.error(VALIDATION_MESSAGES.NO_CHAT_SELECTED);
+      return;
+    }
+
+    // Check if already loading
+    if (loading) {
+      toast.error("⏳ Please wait for the current request to complete");
+      return;
+    }
+
+    // Check credits
+    const creditsNeeded = mode === "image" ? 2 : 1;
+    if (!isSufficientCredits(user.credits, mode)) {
+      setError(
+        `❌ Insufficient credits. Required: ${creditsNeeded}, Available: ${user.credits}`,
+      );
+      toast.error(
+        `❌ Credits needed: ${creditsNeeded}, You have: ${user.credits}`,
+      );
+      return;
+    }
+
+    // Check if prompt is the same as last used
+    if (currentPrompt === lastPromptUsed && mode === lastModeUsed) {
+      setError(VALIDATION_MESSAGES.DUPLICATE_PROMPT);
+      toast.error(VALIDATION_MESSAGES.DUPLICATE_PROMPT);
+      return;
+    }
+
     setPrompt("");
     setLoading(true);
 
@@ -30,10 +88,14 @@ const Chatbox = () => {
           prompt: currentPrompt,
           isPublished,
         },
-        { withCredentials: true }
+        { withCredentials: true },
       );
 
       if (data.success) {
+        // Update last used prompt and mode
+        setLastPromptUsed(currentPrompt);
+        setLastModeUsed(mode);
+
         // Instant local append (optimistic update)
         setMessage((prev) => [
           ...prev,
@@ -45,12 +107,29 @@ const Chatbox = () => {
           },
           data.reply, // Append AI reply immediately
         ]);
+
+        toast.success(
+          mode === "image" ? "🖼️ Image generated!" : "✅ Response received!",
+        );
+      } else {
+        const errorMsg = data.message || "Request failed";
+        setError(errorMsg);
+        toast.error(errorMsg);
       }
     } catch (error) {
-      toast.error(error.response?.data?.message || "Error");
+      const errorMsg = getErrorMessage(error);
+      setError(errorMsg);
+      toast.error(errorMsg);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleModeChange = (newMode) => {
+    if (prompt.trim() === lastPromptUsed && newMode !== mode) {
+      toast.warn(VALIDATION_MESSAGES.MODE_CHANGE_WARNING);
+    }
+    setMode(newMode);
   };
 
   useEffect(() => {
@@ -113,9 +192,26 @@ const Chatbox = () => {
             className="cursor-pointer"
             checked={isPublished}
             onChange={(e) => setIsPublished(e.target.checked)}
+            disabled={loading}
           />
         </label>
       )}
+
+      {/* Error Display */}
+      {error && (
+        <div className="mb-3 p-3 bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700 rounded-lg text-red-700 dark:text-red-300 text-sm">
+          {error}
+        </div>
+      )}
+
+      {/* Credit Warning */}
+      {user && !isSufficientCredits(user.credits, mode) && (
+        <div className="mb-3 p-3 bg-yellow-100 dark:bg-yellow-900/30 border border-yellow-300 dark:border-yellow-700 rounded-lg text-yellow-700 dark:text-yellow-300 text-sm">
+          ⚠️ Low credits! Required: {mode === "image" ? 2 : 1}, Available:{" "}
+          {user.credits}
+        </div>
+      )}
+
       {/* prompt input box */}
       <form
         onSubmit={onSubmit}
@@ -123,31 +219,39 @@ const Chatbox = () => {
       >
         <select
           onChange={(e) => {
-            setMode(e.target.value);
+            handleModeChange(e.target.value);
           }}
           value={mode}
-          className="text-sm pl-2 pr-2 outline-none"
+          disabled={loading}
+          className="text-sm pl-2 pr-2 outline-none disabled:opacity-50 cursor-pointer"
+          aria-label="Content type selector"
         >
-          <option className="drak:bg-purple-900" value="text">
-            Text{" "}
-          </option>
-          <option className="drak:bg-purple-900" value="image">
-            Image{" "}
-          </option>
+          <option value="text">Text</option>
+          <option value="image">Image</option>
         </select>
         <input
           type="text"
-          placeholder="Write the prompt..."
-          className="flex-1 w-full text-sm  outline-none "
-          required
-          onChange={(e) => setPrompt(e.target.value)}
+          placeholder={loading ? "Generating..." : "Write the prompt..."}
+          className="flex-1 w-full text-sm outline-none disabled:opacity-50"
+          disabled={loading}
+          onChange={(e) => {
+            setPrompt(e.target.value);
+            setError(""); // Clear error when user starts typing
+          }}
           value={prompt}
+          maxLength="2000"
+          aria-label="Prompt input"
         />
-        <button type="submit" disabled={loading}>
+        <button
+          type="submit"
+          disabled={loading || !prompt.trim()}
+          className="disabled:opacity-50 disabled:cursor-not-allowed hover:scale-110 transition-transform"
+          aria-label={loading ? "Stop" : "Send"}
+        >
           <img
             src={loading ? assets.stop_icon : assets.send_icon}
-            className="w-8 cursor-pointer "
-            alt=""
+            className="w-8 cursor-pointer"
+            alt={loading ? "Stop" : "Send"}
           />
         </button>
       </form>

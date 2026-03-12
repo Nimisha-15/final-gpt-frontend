@@ -16,6 +16,7 @@ export const AppContextProvider = ({ children }) => {
   const [selectedChats, setSelectedChats] = useState(null);
   const [theme, setTheme] = useState(localStorage.getItem("theme") || "light");
   const [loadingUser, setLoadingUser] = useState(true); // Fixed typo: setloadingUser → setLoadingUser
+  const [token, settoken] = useState(localStorage.getItem("token") || null);
 
   // Fetch authenticated user
   const fetchUser = async () => {
@@ -38,12 +39,12 @@ export const AppContextProvider = ({ children }) => {
 
   // Create a new chat
   const createNewchat = async () => {
-    if (!user) {
-      toast.error("Login to create a new chat");
-      return;
-    }
-
     try {
+      if (!user) {
+        toast.error("Login to create a new chat");
+        return;
+      }
+
       const { data } = await axios.get("/api/chat/create-chat", {
         withCredentials: true,
       });
@@ -54,7 +55,7 @@ export const AppContextProvider = ({ children }) => {
         navigate("/");
       }
     } catch (error) {
-      toast.error("Failed to create chat");
+      toast.error(error.response?.data?.message || "Failed to create chat");
     }
   };
 
@@ -66,16 +67,19 @@ export const AppContextProvider = ({ children }) => {
       });
 
       if (data.success) {
-        setChats(data.chats);
+        setChats(data.chats || []);
 
-        if (data.chats.length === 0) {
-          await createNewchat(); // Auto-create first chat if none exist
-        } else {
+        if (data.chats && data.chats.length === 0) {
+          // Auto-create first chat if none exist
+          await createNewchat();
+        } else if (data.chats && data.chats.length > 0) {
           setSelectedChats(data.chats[0]); // Select the most recent chat
         }
+      } else {
+        setChats([]);
+        setSelectedChats(null);
       }
     } catch (error) {
-      toast.error("Failed to fetch chats");
       setChats([]);
       setSelectedChats(null);
     }
@@ -86,7 +90,7 @@ export const AppContextProvider = ({ children }) => {
     try {
       await axios.post("/api/user/logout", {}, { withCredentials: true });
     } catch (err) {
-      console.error("Logout API failed:", err);
+      // Error logging out - continue with cleanup
     } finally {
       setUser(null);
       setChats([]);
@@ -97,8 +101,13 @@ export const AppContextProvider = ({ children }) => {
 
   // Effects
   useEffect(() => {
-    fetchUser();
-  }, []);
+    if (token) {
+      fetchUser();
+    } else {
+      setUser(null);
+      setLoadingUser(false);
+    }
+  }, [token]);
 
   useEffect(() => {
     if (user) {
@@ -136,6 +145,8 @@ export const AppContextProvider = ({ children }) => {
     setTheme,
     createNewchat,
     loadingUser,
+    token,
+    settoken,
     axios,
   };
 
