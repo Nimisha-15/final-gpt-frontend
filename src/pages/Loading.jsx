@@ -38,13 +38,13 @@ const Loading = () => {
         if (data.success && data.status === "completed") {
           setStatus("success");
           setMessage("Payment successful! Credits added to your account.");
-          
+
           // Refresh user data to show updated credits
-          await new Promise(resolve => setTimeout(resolve, 1500));
+          await new Promise((resolve) => setTimeout(resolve, 1500));
           await fetchUser();
-          
+
           toast.success("Credits purchased successfully! 🎉");
-          
+
           // Redirect to home
           setTimeout(() => {
             navigate("/");
@@ -52,13 +52,14 @@ const Loading = () => {
         } else {
           setStatus("pending");
           setMessage("Payment is being processed...");
-          
+
           // Retry after 3 seconds
           setTimeout(verifyPayment, 3000);
         }
       } catch (error) {
-        const errorMsg = error.response?.data?.message || "Payment verification failed";
-        
+        const errorMsg =
+          error.response?.data?.message || "Payment verification failed";
+
         if (error.response?.status === 404) {
           setStatus("error");
           setMessage("Payment record not found. Please check your order.");
@@ -66,9 +67,9 @@ const Loading = () => {
           setStatus("error");
           setMessage(errorMsg);
         }
-        
+
         toast.error(errorMsg);
-        
+
         // Redirect to credits page on error
         setTimeout(() => {
           navigate("/credits");
