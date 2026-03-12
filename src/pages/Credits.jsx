@@ -35,18 +35,44 @@ const Credits = () => {
       const { data } = await axios.post(
         "/api/payment/purchase",
         { planId },
-        { withCredentials: true }
+        { withCredentials: true },
       );
 
-      if (data.success && data.url) {
-        window.location.href = data.url; // Redirect to Stripe
+      if (data.success && data.url && data.transactionId) {
+        // Store transaction ID and redirect to Stripe
+        sessionStorage.setItem("transactionId", data.transactionId);
+        window.location.href = data.url;
+      } else if (data.success && data.url) {
+        // Fallback if transactionId is not returned
+        window.location.href = data.url;
       } else {
-        toast.error(data.message || "Failed to start checkout");
+        // Show detailed error if available
+        const errorMsg = data.details
+          ? `${data.message}\n${data.details}`
+          : data.message || "Failed to start checkout";
+        toast.error(errorMsg);
       }
     } catch (error) {
-      toast.error(
-        error.response?.data?.message || "Payment failed. Try again."
-      );
+      // Enhanced error messages for debugging
+      const statusCode = error.response?.status;
+      const errorData = error.response?.data;
+
+      let errorMsg = "Payment failed. Please try again.";
+
+      if (statusCode === 401) {
+        errorMsg = "Please login first before making a purchase";
+      } else if (statusCode === 400) {
+        errorMsg =
+          errorData?.message ||
+          "Invalid request. Please check your plan selection.";
+      } else if (statusCode === 500) {
+        errorMsg =
+          errorData?.message || "Server error. Please contact support.";
+      } else if (!error.response) {
+        errorMsg = "Connection error. Please check your network.";
+      }
+
+      toast.error(errorMsg);
     }
   };
 

@@ -33,13 +33,18 @@ const Sidebar = ({ isMenuOpen, setIsMenuOpen }) => {
         { chatId },
         { withCredentials: true },
       );
-      if (data.createdChat) {
-        setChats((prev) => prev.filter((chat) => chat._id !== chatId)); // chats update karo
-        await fetchUserChats();
-        toast.success(data.message);
+      if (data.success) {
+        setChats((prev) => prev.filter((chat) => chat._id !== chatId));
+        const remainingChats = chats.filter((chat) => chat._id !== chatId);
+        if (remainingChats.length > 0) {
+          setSelectedChats(remainingChats[0]);
+        } else {
+          await createNewchat();
+        }
+        toast.success("Chat deleted successfully");
       }
     } catch (error) {
-      toast.error(error.message);
+      toast.error(error.response?.data?.message || error.message);
     }
   };
 

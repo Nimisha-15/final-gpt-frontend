@@ -3,8 +3,61 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import toast from "react-hot-toast";
 
-// default url
-axios.defaults.baseURL = import.meta.env.VITE_SERVER_URL;
+// Default URL configuration
+const serverUrl = import.meta.env.VITE_SERVER_URL || "http://localhost:4500";
+axios.defaults.baseURL = serverUrl;
+axios.defaults.withCredentials = true;
+axios.defaults.headers.common["Content-Type"] = "application/json";
+
+// Request interceptor - add auth header if needed
+axios.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem("token");
+    if (token && !config.headers.Authorization) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error),
+);
+
+// Response interceptor for error handling
+axios.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const { response, message } = error;
+
+    // Handle CORS errors
+    if (message?.includes("CORS") || message?.includes("Network Error")) {
+      toast.error(
+        "Connection error. Please check your network or server configuration.",
+      );
+    }
+
+    // Handle authentication errors
+    if (response?.status === 401) {
+      localStorage.removeItem("token");
+      window.location.replace("/login");
+    }
+
+    // Handle forbidden errors
+    if (response?.status === 403) {
+      toast.error("Access denied. You don't have permission for this action.");
+    }
+
+    // Handle server errors
+    if (response?.status === 500) {
+      toast.error("Server error. Please try again later.");
+    }
+
+    // Handle rate limiting
+    if (response?.status === 429) {
+      toast.error("Too many requests. Please wait before trying again.");
+    }
+
+    return Promise.reject(error);
+  },
+);
 
 const AppContext = createContext();
 
@@ -15,7 +68,7 @@ export const AppContextProvider = ({ children }) => {
   const [chats, setChats] = useState([]);
   const [selectedChats, setSelectedChats] = useState(null);
   const [theme, setTheme] = useState(localStorage.getItem("theme") || "light");
-  const [loadingUser, setLoadingUser] = useState(true); // Fixed typo: setloadingUser → setLoadingUser
+  const [loadingUser, setLoadingUser] = useState(true);
   const [token, settoken] = useState(localStorage.getItem("token") || null);
 
   // Fetch authenticated user
